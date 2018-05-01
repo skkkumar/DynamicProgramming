@@ -1,0 +1,119 @@
+classdef SearchSpace < handle
+    %UNTITLED8 Summary of this class goes here
+    %   Detailed explanation goes here
+    
+    properties
+        contourLine1
+        contourLine2
+        copySearchSpace
+        searchSpace
+        lineMatrix
+        copyLineMatrix
+        realContourMatrix
+        noOfPoints
+    end
+    
+    methods
+        
+        function loadContours(searchObject, fileName1, fileName2)
+            searchObject.contourLine1 = load(fileName1); % simple2.ctr, init1.ctr
+            searchObject.contourLine2 = load(fileName2); % simple1.ctr, init2.ctr
+            % get dimensions that will be used later
+            [searchObject.noOfPoints] = size(searchObject.contourLine1);
+        end
+        
+        function makeSearchSpace(searchObject, fileName1, fileName2, imageMatrix)
+            % take sample values from the search space defined by these lines
+            loadContours(searchObject, fileName1, fileName2)
+            
+            % make lines
+            searchObject.searchSpace = [];%zeros(mValue, mValue);
+            
+            searchObject.lineMatrix = [];
+            %lineIndex = 1;
+            for lineIndex = 1 : searchObject.noOfPoints
+                
+                startX = searchObject.contourLine2(lineIndex,1);
+                startY = searchObject.contourLine2(lineIndex,2);
+                endX = searchObject.contourLine1(lineIndex,1);
+                endY = searchObject.contourLine1(lineIndex,2);
+                
+                deltaX  = endX - startX;
+                deltaY  = endY - startY;
+                
+                %calculate slope
+                slope = (endY- startY ) / (endX - startX);
+                
+                %disp(['start x' , num2str(startX), ' start y ' , num2str(startY), ' endX ' , num2str(endX), ' endY ' , num2str(endY)] );
+                %disp(['slope ' , num2str(slope)] );
+                
+                if slope < - 1
+                    disp('here');
+                    
+                    error1 = - 2 * deltaX;
+                    error2 = - 2 * deltaX - 2 * deltaY;
+                    pointX = startX;
+                    pointY = startY;
+                    rowCounter = 1;
+                    
+                    searchObject.searchSpace(rowCounter , lineIndex) = 1 - imageMatrix( pointY, pointX);
+                    %disp(['point --> ' , num2str(rowCounter), ' ' , num2str(lineIndex) ,' : ' ,  num2str(pointX), ', ', num2str( pointY) , 's intensity = ' , num2str(imageMatrix( pointX , pointY))]);
+                    searchObject.lineMatrix(lineIndex, pointY - searchObject.contourLine2(lineIndex,2) + 1, 1) = pointX;
+                    searchObject.lineMatrix(lineIndex, pointY - searchObject.contourLine2(lineIndex,2) + 1, 2) = pointY;
+                    
+                    
+                    error = - deltaY - 2 * deltaX;
+                    
+                    for pointY = startY + 1: endY
+                        %disp(['error ' , num2str(error)]);
+                        
+                        if error > 0
+                            pointX = pointX - 1;
+                            error = error + error2;
+                        else
+                            error = error + error1;
+                        end
+                        rowCounter = rowCounter + 1;
+                        searchObject.searchSpace(rowCounter , lineIndex) = 1 - imageMatrix(  pointY, pointX);
+                        %disp(['point --> ' , num2str(rowCounter), ' ' , num2str(lineIndex) ,' : ' ,  num2str(pointX), ', ', num2str( pointY) , 's intensity = ' , num2str(imageMatrix( pointX , pointY))]);
+                        searchObject.lineMatrix(lineIndex, pointY - searchObject.contourLine2(lineIndex,2) + 1, 1) = pointX;
+                        searchObject.lineMatrix(lineIndex, pointY - searchObject.contourLine2(lineIndex,2) + 1, 2) = pointY;
+                        
+                    end
+                    
+                end
+            end
+            
+            % invert search space
+            [rows,columns] = size(searchObject.searchSpace);
+            searchObject.searchSpace = ones(rows, columns) - searchObject.searchSpace;
+            
+            %make copies so that later the originals can be modified and
+            %filtered
+            searchObject.copySearchSpace = searchObject.searchSpace;
+            searchObject.copyLineMatrix = searchObject.lineMatrix;
+        end
+        
+        function filterSearchSpace(searchObject, distance)
+            [rows, columns ] = size(searchObject.copySearchSpace);
+            newSearchSpace = zeros(floor(rows / distance) , columns);
+            
+           
+            for pointIndex = 1 : rows
+                if mod(pointIndex, distance) == 0 
+                    for columnIndex = 1 : columns
+                        newSearchSpace(pointIndex / distance, columnIndex) = searchObject.copySearchSpace(pointIndex, columnIndex);
+                        
+                        
+                    
+                    end
+                end
+            end
+            
+            searchObject.searchSpace = newSearchSpace;
+        end
+            
+    end
+    
+end
+
